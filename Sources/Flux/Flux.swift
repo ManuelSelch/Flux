@@ -1,23 +1,25 @@
 import Foundation
 
-public struct Flux {
-    public protocol Feature {
-        associatedtype State
-        associatedtype Action
-    }
-    
-    public typealias StoreOf<F: Feature> = BaseStore<F.State, F.Action>
-    
-    
-    public typealias Middleware<State, Action> = (State, Action, @escaping (Action) -> ()) -> ()
+public protocol Feature {
+    associatedtype State
+    associatedtype Action
 }
 
-public class BaseStore<S, A>: ObservableObject {
+public typealias StoreOf<F: Feature> = BaseStore<F.State, F.Action>
+
+
+public typealias Middleware<State, Action> = (State, Action, @escaping (Action) -> ()) -> ()
+
+open class BaseStore<S, A>: ObservableObject {
+    public typealias State = S
+    public typealias Action = A
+    public typealias M = Middleware<S, A>
+    
     @Published public private(set) var state: S
     private let stateQueue = DispatchQueue(label: "flux.state.queue", qos: .userInitiated)
     private let middlewares: [Flux.Middleware<S, A>]
     
-    init(state: S, middlewares: [Flux.Middleware<S, A>]) {
+    public init(state: S, middlewares: [Flux.Middleware<S, A>]) {
         self.state = state
         self.middlewares = middlewares
     }
@@ -34,7 +36,7 @@ public class BaseStore<S, A>: ObservableObject {
         }
     }
     
-    func reduce(_ state: inout S, _ action: A) {
+    open func reduce(_ state: inout S, _ action: A) {
         
     }
 }
