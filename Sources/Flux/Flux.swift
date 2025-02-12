@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 public protocol Feature {
     associatedtype State
@@ -6,8 +7,6 @@ public protocol Feature {
 }
 
 public typealias StoreOf<F: Feature> = BaseStore<F.State, F.Action>
-
-
 public typealias Middleware<State, Action> = (State, Action, @escaping (Action) -> ()) -> ()
 
 open class BaseStore<S, A>: ObservableObject {
@@ -18,6 +17,8 @@ open class BaseStore<S, A>: ObservableObject {
     @Published public private(set) var state: S
     private let stateQueue = DispatchQueue(label: "flux.state.queue", qos: .userInitiated)
     private let middlewares: [Flux.Middleware<S, A>]
+    
+    var cancellables: Set<AnyCancellable> = []
     
     public init(state: S, middlewares: [Flux.Middleware<S, A>]) {
         self.state = state
