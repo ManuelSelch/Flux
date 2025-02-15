@@ -108,7 +108,6 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
         
         
         let effectsDone = isEffectsDone()
-        print("finish effects: \(effectCount)")
         
         if(!effectsDone) {
             Issue.record(
@@ -128,8 +127,6 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
                 """,
                 sourceLocation: sourceLocation
             )
-        } else {
-            print("no active effects: \(recordedActions.count)")
         }
     }
     
