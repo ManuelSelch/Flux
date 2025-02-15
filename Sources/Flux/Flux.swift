@@ -2,26 +2,24 @@ import Foundation
 import Combine
 
 public protocol Feature {
-    associatedtype State
-    associatedtype Action: Sendable
+    associatedtype State: Equatable
+    associatedtype Action: Sendable & Equatable
 }
 
-public typealias StoreOf<F: Feature> = BaseStore<F.State, F.Action>
+public typealias StoreOf<F: Feature> = FluxStore<F.State, F.Action>
 public typealias Middleware<State, Action> =
     @Sendable (State, Action) async -> (Action?)
 
 
-open class BaseStore<S, A: Sendable>: ObservableObject {
+open class FluxStore<S: Equatable, A: Sendable>: ObservableObject {
     public typealias State = S
     public typealias Action = A
     public typealias M = Middleware<S, A>
     
     @Published public private(set) var state: S
-    private let stateQueue = DispatchQueue(label: "flux.state.queue", qos: .userInitiated)
-    private let middlewares: [M]
-    
-    var cancellables: Set<AnyCancellable> = []
-    
+    internal var middlewares: [M]
+
+
     public init(state: S, middlewares: [M]) {
         self.state = state
         self.middlewares = middlewares
@@ -29,11 +27,13 @@ open class BaseStore<S, A: Sendable>: ObservableObject {
     
     @MainActor
     public func dispatch(_ action: A) {
+        print("dispatch \(action)")
         self.reduce(&self.state, action)
     
         middlewares.forEach { middleware in
             Task {
                 guard let action = await middleware(state, action) else { return }
+                
                 Task { @MainActor [self] in
                     self.dispatch(action)
                 }
@@ -41,42 +41,10 @@ open class BaseStore<S, A: Sendable>: ObservableObject {
         }
     }
     
+    
+    
     open func reduce(_ state: inout S, _ action: A) {
         
     }
 }
 
-/*
-public extension AnyPublisher {
-    static func dispatch(_ action: Output) -> AnyPublisher<Output, Failure> {
-        return Just(action)
-            .setFailureType(to: Failure.self)
-            .eraseToAnyPublisher()
-    }
-    
-    static func merge(_ publishers: [AnyPublisher<Output, Failure>]) -> AnyPublisher<Output, Failure> {
-        return Publishers.MergeMany(publishers)
-            .eraseToAnyPublisher()
-    }
-    
-    static var none: AnyPublisher<Output, Failure> {
-        Empty()
-            .setFailureType(to: Failure.self)
-            .eraseToAnyPublisher()
-    }
-    
-    static func run(
-        _ operation: @escaping @Sendable () -> (Output?)
-    ) -> AnyPublisher<Output, Failure>
-    {
-        
-        return Future { promise in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                if let result = operation() {
-                    promise(.success(result))
-                }
-            }
-        }.eraseToAnyPublisher()
-    }
-}
-*/
