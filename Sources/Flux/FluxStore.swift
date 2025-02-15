@@ -27,7 +27,6 @@ open class FluxStore<S: Equatable, A: Sendable>: ObservableObject {
     
     @MainActor
     public func dispatch(_ action: A) {
-        print("dispatch \(action)")
         self.reduce(&self.state, action)
     
         middlewares.forEach { middleware in

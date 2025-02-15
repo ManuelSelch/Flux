@@ -26,18 +26,15 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
                 self.effects.enter()
                 self.effectCount += 1
                 self.isEffectsTriggered = true
-                print("effects enter: \(self.effectCount)")
                 
                 
                 let effect = await m(state, action)
                 if let effect = effect {
-                    print("effect: \(effect)")
                     self.recordedActions.append(effect)
                 }
                 
                 self.effectCount -= 1
                 self.effects.leave()
-                print("effects leave: \(self.effectCount)")
                 
                 return effect
             }
