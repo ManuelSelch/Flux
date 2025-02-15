@@ -226,11 +226,6 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
 
 
 // MARK: - helper methods
-extension String: LocalizedError {
-    public var errorDescription: String? { return self }
-}
-
-
 func debugOutput(_ value: Any, indent: Int = 0) -> String {
     var visitedItems: Set<ObjectIdentifier> = []
 
