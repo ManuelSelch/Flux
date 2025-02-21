@@ -2,54 +2,51 @@ import Foundation
 import Testing
 @testable import Flux
 
-public typealias TestStoreOf<F: Feature> = TestStore<F.State, F.Action>
-
-public class TestStore<State: Equatable, Action: Sendable & Equatable>: @unchecked Sendable {
+@MainActor
+public class TestStore<F: Feature> {
+    public typealias State = F.State
+    public typealias Action = F.Action
+    public typealias M = Middleware<F>
+    
+    public private(set) var state: State
+    internal var reduce: (inout State, Action) -> ()
+    internal var middlewares: [M] = []
+    
     private var recordedActions: [Action] = []
-    private var store: FluxStore<State, Action>
     
     private let effects = DispatchGroup()
     private var effectCount = 0
-    private var isEffectsTriggered = false
-    
-    public init(
-        store: FluxStore<State, Action>
-    ) {
-        self.store = store
-        track()
+
+    public init(state: State, _ feature: F, middlewares: [M]) {
+        self.state = state
+        self.reduce = feature.reduce
+        self.middlewares = middlewares
     }
     
-    private func track() {
-        let trackedMiddlewares: [Middleware<State, Action>] = store.middlewares.map { m in
-            
-            return { state, action in
-                self.effects.enter()
-                self.effectCount += 1
-                self.isEffectsTriggered = true
+    public func dispatch(_ action: Action) {
+        self.reduce(&self.state, action)
+        self.recordedActions.append(action)
+    
+        middlewares.forEach { middleware in
+            effects.enter()
+            effectCount += 1
+            Task {
+                guard let action =  middleware(state, action) else {return}
+                self.dispatch(action)
                 
-                
-                let effect = await m(state, action)
-                if let effect = effect {
-                    self.recordedActions.append(effect)
+                defer {
+                    effects.leave()
+                    effectCount -= 1
                 }
-                
-                self.effectCount -= 1
-                self.effects.leave()
-                
-                return effect
             }
         }
-        
-        store.middlewares = trackedMiddlewares
     }
     
-    @MainActor
-    public func dispatch(_ action: Action) {
-        store.dispatch(action)
-        self.recordedActions.append(action)
+    private func addEffect(_ effect: Action) {
+        self.recordedActions.append(effect)
     }
     
-    @MainActor
+   
     public func dispatch(
         _ action: Action,
         _ expected: @escaping (inout State) -> (),
@@ -65,9 +62,10 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
             )
         }
         
-        var oldState = self.store.state
-        store.dispatch(action)
-        let newState = self.store.state
+        var oldState = self.state
+        dispatch(action)
+        recordedActions.removeFirst()
+        let newState = self.state
         
         expected(&oldState)
         
@@ -96,8 +94,7 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
     
     func isEffectsDone() -> Bool {
         return
-            effects.wait(timeout: DispatchTime.now() + .seconds(5)) == .success &&
-            isEffectsTriggered
+            effects.wait(timeout: DispatchTime.now() + .seconds(5)) == .success
     }
     
 
@@ -130,7 +127,6 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
         }
     }
     
-    @MainActor
     public func receive(
         _ action: Action, _ expected: @escaping (inout State) -> (),
         sourceLocation: SourceLocation = #_sourceLocation
@@ -142,12 +138,11 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
     }
     
     
-    @MainActor
     public func receive(
         _ actions: [Action], _ expected: @escaping (inout State) -> (),
         sourceLocation: SourceLocation = #_sourceLocation
     ) async {
-        var oldState = self.store.state
+        var oldState = self.state
         
         let success = await waitUntil {
             self.recordedActions.contains(actions)
@@ -176,7 +171,7 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
         }
         recordedActions.removeAll()
         
-        let newState = self.store.state
+        let newState = self.state
         expected(&oldState)
         
         
@@ -202,7 +197,6 @@ public class TestStore<State: Equatable, Action: Sendable & Equatable>: @uncheck
 
     }
     
-    @MainActor
     func waitUntil(condition: @escaping () -> Bool, timeout: TimeInterval = 1.0) async -> Bool {
         let startTime = Date()
 

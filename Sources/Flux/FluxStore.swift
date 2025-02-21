@@ -4,46 +4,40 @@ import Combine
 public protocol Feature {
     associatedtype State: Equatable
     associatedtype Action: Sendable & Equatable
+    
+    init()
+    func reduce(_ state: inout State, _ action: Action)
 }
 
-public typealias StoreOf<F: Feature> = FluxStore<F.State, F.Action>
-public typealias Middleware<State, Action> =
-    @Sendable (State, Action) async -> (Action?)
+public typealias Middleware<F: Feature> =
+    @Sendable (F.State, F.Action) -> (F.Action?)
 
-
-open class FluxStore<S: Equatable, A: Sendable>: ObservableObject {
-    public typealias State = S
-    public typealias Action = A
-    public typealias M = Middleware<S, A>
+@MainActor
+public class FluxStore<F: Feature>: ObservableObject {
+    public typealias State = F.State
+    public typealias Action = F.Action
+    public typealias M = Middleware<F>
     
-    @Published public private(set) var state: S
+    @Published public private(set) var state: State
+    internal var reduce: (inout State, Action) -> ()
     internal var middlewares: [M]
 
 
-    public init(state: S, middlewares: [M]) {
+    public init(state: State, _ feature: F, middlewares: [M] = []) {
         self.state = state
+        self.reduce = feature.reduce
         self.middlewares = middlewares
     }
     
-    @MainActor
-    public func dispatch(_ action: A) {
+    public func dispatch(_ action: Action) {
         self.reduce(&self.state, action)
     
         middlewares.forEach { middleware in
             Task {
-                guard let action = await middleware(state, action) else { return }
-                
-                Task { @MainActor [self] in
-                    self.dispatch(action)
-                }
+                guard let action = middleware(state, action) else {return}
+                self.dispatch(action)
             }
         }
-    }
-    
-    
-    
-    open func reduce(_ state: inout S, _ action: A) {
-        
     }
 }
 
