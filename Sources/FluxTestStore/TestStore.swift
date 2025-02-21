@@ -31,13 +31,13 @@ public class TestStore<F: Feature> {
             effects.enter()
             effectCount += 1
             Task {
-                guard let action =  middleware(state, action) else {return}
-                self.dispatch(action)
-                
                 defer {
                     effects.leave()
                     effectCount -= 1
                 }
+                
+                guard let action = await middleware(state, action) else {return}
+                self.dispatch(action)
             }
         }
     }

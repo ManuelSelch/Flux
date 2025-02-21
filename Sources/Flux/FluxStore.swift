@@ -2,7 +2,7 @@ import Foundation
 import Combine
 
 public protocol Feature {
-    associatedtype State: Equatable
+    associatedtype State: Equatable & Sendable
     associatedtype Action: Sendable & Equatable
     
     init()
@@ -10,7 +10,7 @@ public protocol Feature {
 }
 
 public typealias Middleware<F: Feature> =
-    @Sendable (F.State, F.Action) -> (F.Action?)
+    @Sendable (F.State, F.Action) async -> (F.Action?)
 
 @MainActor
 public class FluxStore<F: Feature>: ObservableObject {
@@ -34,7 +34,7 @@ public class FluxStore<F: Feature>: ObservableObject {
     
         middlewares.forEach { middleware in
             Task {
-                guard let action = middleware(state, action) else {return}
+                guard let action = await middleware(state, action) else {return}
                 self.dispatch(action)
             }
         }
