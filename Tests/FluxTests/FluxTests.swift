@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Flux
 import FluxTestStore
@@ -26,22 +27,39 @@ struct TestFeature: Feature {
 }
 
 let myMiddleware: Middleware<TestFeature> = { state, action in
-    return .none
+    switch(action) {
+    case .decrement:
+        return .increment
+    default:
+        return .none
+    }
 }
 
-@MainActor
-struct FluxTests {
-    var store: TestStore<TestFeature>
+class FluxTests {
+    let store: TestStore<TestFeature>
     
     init() {
-        self.store = .init(state: .init(), middlewares: [myMiddleware])
+        store = TestStore<TestFeature>(state: .init(), middlewares: [myMiddleware])
+    }
+    
+    deinit {
+        store.tearDown()
     }
     
     @Test
-    func onDispatch_actionReduced() {
+    @MainActor
+    func actionIsReduced_onDispatch() async {
         store.dispatch(.increment) { $0.count = 1 }
         store.dispatch(.increment) { $0.count = 2 }
+    }
+    
+    @Test
+    @MainActor
+    func effectIsTriggered_onDispatch() async {
+        store.dispatch(.decrement) { $0.count = -1 }
         
-        store.tearDown()
+        await store.receive(.increment) {
+            $0.count = 0
+        }
     }
 }

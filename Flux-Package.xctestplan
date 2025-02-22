@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "875C7B97-3D49-437C-AEAE-0E8432909966",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "FluxTests",
+        "name" : "FluxTests"
+      }
+    }
+  ],
+  "version" : 1
+}

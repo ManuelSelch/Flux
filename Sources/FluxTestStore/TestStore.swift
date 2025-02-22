@@ -2,7 +2,6 @@ import Foundation
 import Testing
 @testable import Flux
 
-@MainActor
 public class TestStore<F: Feature> {
     public typealias State = F.State
     public typealias Action = F.Action
@@ -16,13 +15,19 @@ public class TestStore<F: Feature> {
     
     private let effects = DispatchGroup()
     private var effectCount = 0
+    private var isEffects = false
 
     public init(state: F.State, middlewares: [M] = []) {
         self.state = state
         self.reduce = F().reduce
         self.middlewares = middlewares
+        
+        self.effects.notify(queue: .main) {
+            self.isEffects = false
+        }
     }
     
+    @MainActor
     public func dispatch(_ action: Action) {
         self.reduce(&self.state, action)
         self.recordedActions.append(action)
@@ -31,7 +36,12 @@ public class TestStore<F: Feature> {
             enterEffect()
             
             Task {
-                leaveEffect()
+                let effect = await middleware(state, action)
+                if let effect = effect {
+                    dispatch(effect)
+                }
+                
+                self.leaveEffect()
             }
         }
     }
@@ -39,6 +49,7 @@ public class TestStore<F: Feature> {
     private func enterEffect() {
         effects.enter()
         effectCount += 1
+        isEffects = true
     }
     
     private func leaveEffect() {
@@ -51,6 +62,7 @@ public class TestStore<F: Feature> {
     }
     
    
+    @MainActor
     public func dispatch(
         _ action: Action,
         _ expected: @escaping (inout State) -> (),
@@ -96,6 +108,10 @@ public class TestStore<F: Feature> {
     
     
     func isEffectsDone() -> Bool {
+        if(!isEffects) {
+            return true
+        }
+        
         return
             effects.wait(timeout: DispatchTime.now() + .seconds(5)) == .success
     }
@@ -130,6 +146,7 @@ public class TestStore<F: Feature> {
         }
     }
     
+    @MainActor
     public func receive(
         _ action: Action, _ expected: @escaping (inout State) -> (),
         sourceLocation: SourceLocation = #_sourceLocation
@@ -141,6 +158,7 @@ public class TestStore<F: Feature> {
     }
     
     
+    @MainActor
     public func receive(
         _ actions: [Action], _ expected: @escaping (inout State) -> (),
         sourceLocation: SourceLocation = #_sourceLocation
@@ -199,6 +217,7 @@ public class TestStore<F: Feature> {
 
     }
     
+    @MainActor
     func waitUntil(condition: @escaping () -> Bool, timeout: TimeInterval = 1.0) async -> Bool {
         let startTime = Date()
 
