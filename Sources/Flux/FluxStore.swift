@@ -23,9 +23,9 @@ public class FluxStore<F: Feature>: ObservableObject {
     internal var middlewares: [M]
 
 
-    public init(state: State, _ feature: F, middlewares: [M] = []) {
+    public init(state: F.State, middlewares: [M] = []) {
         self.state = state
-        self.reduce = feature.reduce
+        self.reduce = F().reduce
         self.middlewares = middlewares
     }
     
