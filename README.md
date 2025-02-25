@@ -72,3 +72,52 @@ let myMiddleware: Middleware<TestFeature> = { state, action in
     }
 }
 ```
+
+## Unit Tests
+### test feature without side effects
+- dispatch an action and compare expected and received state
+- FluxTestStore checks all state changes
+
+```swift
+import FluxTestStore
+
+class CounterTests {
+    let store: TestStoreOf<CounterFeature>
+
+    init() {
+        store = .init(state: .init())
+    }
+
+    deinit {
+        store.tearDown()
+    }
+
+
+    @Test
+    @MainActor
+    func counterIsIncremented_onIncrement() async {
+        store.dispatch(.increment) { $0.count = 1 }
+        store.dispatch(.increment) { $0.count = 2 }
+    }
+
+    @Test
+    @MainActor
+    func counterIsDecremented_onDecrement() async {
+        store.dispatch(.decrement) { $0.count = -1 }
+        store.dispatch(.decrement) { $0.count = -2 }
+    }
+}
+```
+
+### test side effects
+- FluxTestStore detects running side effects
+- and gives an error if some effects are not handles
+
+```swift
+    @Test
+    @MainActor
+    func counterWillBeIncremented_onDecrement() async {
+        store.dispatch(.decrement) { $0.count = -1 }
+        store.receive(.increment) { $0.count = 0 }
+    }
+```
