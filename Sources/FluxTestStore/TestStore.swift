@@ -166,7 +166,11 @@ public class TestStore<F: Feature> {
         var oldState = self.state
         
         let success = await waitUntil {
-            self.recordedActions.contains(actions)
+            if #available(iOS 16.0, *) {
+                return self.recordedActions.contains(actions)
+            } else {
+                return actions.allSatisfy { a in self.recordedActions.contains(where: {$0 == a}) }
+            }
         }
         
         if(!success) {
