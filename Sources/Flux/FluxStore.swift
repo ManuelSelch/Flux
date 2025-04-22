@@ -6,6 +6,8 @@ public protocol Feature {
     associatedtype Action: Sendable & Equatable
     
     init()
+    
+    @MainActor
     func reduce(_ state: inout State, _ action: Action)
 }
 
