@@ -15,5 +15,6 @@ let package = Package(
             dependencies: ["Flux"]
         ),
         .testTarget(name: "FluxTests", dependencies: ["Flux", "FluxTestStore"]),
-    ]
+    ],
+    swiftLanguageModes: [.version("6"), .v5]
 )
