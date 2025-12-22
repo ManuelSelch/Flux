@@ -4,13 +4,13 @@ import Testing
 import FluxTestStore
 
 struct TestFeature: Feature {
-    enum Action: Equatable, Sendable {
+    nonisolated enum Action: Equatable, Sendable {
         case increment
         case decrement
         case load
     }
     
-    struct State: Equatable, Sendable {
+    nonisolated struct State: Equatable, Sendable {
         var count = 0
     }
     

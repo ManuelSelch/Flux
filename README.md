@@ -31,12 +31,12 @@ dependencies: [
 import Flux
 
 struct CounterFeature: Feature {
-    enum Action: Equatable, Sendable {
+    nonisolated enum Action: Equatable, Sendable {
         case increment
         case decrement
     }
     
-    struct State: Equatable, Sendable {
+    nonisolated struct State: Equatable, Sendable {
         var count = 0
     }
     

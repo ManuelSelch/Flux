@@ -154,7 +154,7 @@ struct Logger {
                 return "\(value)"
                     .indent(by: indent)
                 
-            @unknown default:
+            default:
                 return "\(value)"
                     .indent(by: indent)
             }

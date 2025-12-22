@@ -8,7 +8,6 @@ public class TestStore<F: Feature> {
     public typealias M = Middleware<F>
     
     public private(set) var state: State
-    internal var reduce: (inout State, Action) -> ()
     internal var middlewares: [M] = []
     
     private var recordedActions: [Action] = []
@@ -19,7 +18,6 @@ public class TestStore<F: Feature> {
 
     public init(state: F.State, middlewares: [M] = []) {
         self.state = state
-        self.reduce = F().reduce
         self.middlewares = middlewares
         
         self.effects.notify(queue: .main) {
@@ -29,7 +27,7 @@ public class TestStore<F: Feature> {
     
     @MainActor
     public func dispatch(_ action: Action) {
-        self.reduce(&self.state, action)
+        F().reduce(&self.state, action)
         self.recordedActions.append(action)
     
         middlewares.forEach { middleware in
