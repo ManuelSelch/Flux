@@ -35,31 +35,24 @@ let myMiddleware: Middleware<TestFeature> = { state, action in
     }
 }
 
-class FluxTests {
-    let store: TestStore<TestFeature>
-    
-    init() {
-        store = TestStore<TestFeature>(state: .init(), middlewares: [myMiddleware])
-    }
-    
-    deinit {
-        store.tearDown()
-    }
-    
+@MainActor
+struct FluxTests {
     @Test
-    @MainActor
     func actionIsReduced_onDispatch() async {
+        let store = TestStore<TestFeature>(state: .init(), middlewares: [myMiddleware])
         store.dispatch(.increment) { $0.count = 1 }
         store.dispatch(.increment) { $0.count = 2 }
+        await store.finish()
     }
-    
+
     @Test
-    @MainActor
     func effectIsTriggered_onDispatch() async {
+        let store = TestStore<TestFeature>(state: .init(), middlewares: [myMiddleware])
         store.dispatch(.decrement) { $0.count = -1 }
-        
+
         await store.receive(.increment) {
             $0.count = 0
         }
+        await store.finish()
     }
 }

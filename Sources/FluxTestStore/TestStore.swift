@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Flux
 
+@MainActor
 public class TestStore<F: Feature> {
     public typealias State = F.State
     public typealias Action = F.Action
@@ -12,17 +13,11 @@ public class TestStore<F: Feature> {
     
     private var recordedActions: [Action] = []
     
-    private let effects = DispatchGroup()
-    private var effectCount = 0
-    private var isEffects = false
+    private var effectTasks: [UUID: Task<Void, Never>] = [:]
 
     public init(state: F.State, middlewares: [M] = []) {
         self.state = state
         self.middlewares = middlewares
-        
-        self.effects.notify(queue: .main) {
-            self.isEffects = false
-        }
     }
     
     @MainActor
@@ -31,32 +26,14 @@ public class TestStore<F: Feature> {
         self.recordedActions.append(action)
     
         middlewares.forEach { middleware in
-            enterEffect()
-            
-            Task {
+            let id = UUID()
+            effectTasks[id] = Task {
+                defer { self.effectTasks[id] = nil }
                 let effect = await middleware(state, action)
-                if let effect = effect {
-                    dispatch(effect)
-                }
-                
-                self.leaveEffect()
+                guard !Task.isCancelled, let effect else { return }
+                dispatch(effect)
             }
         }
-    }
-    
-    private func enterEffect() {
-        effects.enter()
-        effectCount += 1
-        isEffects = true
-    }
-    
-    private func leaveEffect() {
-        effects.leave()
-        effectCount -= 1
-    }
-    
-    private func addEffect(_ effect: Action) {
-        self.recordedActions.append(effect)
     }
     
    
@@ -105,34 +82,40 @@ public class TestStore<F: Feature> {
     }
     
     
-    func isEffectsDone() -> Bool {
-        if(!isEffects) {
-            return true
+    /// Wait for all middleware, including follow-up tasks, without blocking the main actor.
+    /// Receive expected actions before finishing. On timeout/cancellation, report pending
+    /// work and request its cancellation; cancellation-ignoring middleware cannot be forced to stop.
+    public func finish(
+        timeout: TimeInterval = 5,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        let completed = await waitUntil(condition: { self.effectTasks.isEmpty }, timeout: timeout)
+        if !completed {
+            let count = effectTasks.count
+            for task in effectTasks.values { task.cancel() }
+            Issue.record(
+                "Timed out or cancelled while finishing: \(count) middleware task(s) still running.",
+                sourceLocation: sourceLocation
+            )
         }
-        
-        return
-            effects.wait(timeout: DispatchTime.now() + .seconds(5)) == .success
+        assertNoRecordedActions(sourceLocation: sourceLocation)
     }
-    
 
+    /// Nonblocking safety check, not a replacement for awaiting finish().
     public func tearDown(
         file: StaticString = #file, line: UInt = #line,
         sourceLocation: SourceLocation = #_sourceLocation
     ) {
-        
-        
-        let effectsDone = isEffectsDone()
-        
-        if(!effectsDone) {
+        if !effectTasks.isEmpty {
             Issue.record(
-                """
-                unhandles effects: some effects are still running
-                \(effectCount)
-                """,
+                "Unhandled effects: \(effectTasks.count) middleware task(s) still running. Await finish() before teardown.",
                 sourceLocation: sourceLocation
             )
         }
-        
+        assertNoRecordedActions(sourceLocation: sourceLocation)
+    }
+
+    private func assertNoRecordedActions(sourceLocation: SourceLocation) {
         if(recordedActions.count > 0) {
             Issue.record(
                 """
@@ -221,14 +204,17 @@ public class TestStore<F: Feature> {
     
     @MainActor
     func waitUntil(condition: @escaping () -> Bool, timeout: TimeInterval = 1.0) async -> Bool {
-        let startTime = Date()
+        let startTime = ProcessInfo.processInfo.systemUptime
 
         while !condition() {
-            let elapsed = Date().timeIntervalSince(startTime)
-            if elapsed >= timeout {
+            if Task.isCancelled || ProcessInfo.processInfo.systemUptime - startTime >= timeout {
                 return false
             }
-            try? await Task.sleep(nanoseconds: 500_000_00)
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000)
+            } catch {
+                return false
+            }
         }
         
         return true

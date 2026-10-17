@@ -74,6 +74,21 @@ let myMiddleware: Middleware<TestFeature> = { state, action in
 ```
 
 ## Unit Tests
+
+`TestStore` is main-actor isolated. Create one store per test, receive expected
+responses, then call `await store.finish()` before the test returns. `finish()`
+waits asynchronously for all middleware tasks, including follow-up work, and
+reports any unreceived actions. Its default timeout is five seconds; use
+`await store.finish(timeout: 10)` when a test intentionally needs longer.
+
+On timeout or cancellation, pending tasks are reported and cancellation is
+requested. Middleware must cooperate with cancellation to stop; Swift cannot
+forcibly terminate work that ignores it. Cancelled middleware responses are not
+dispatched.
+
+`store.tearDown()` is a **nonblocking assertion check**. It may be used as a final
+safety check, but it does not wait for or cancel work and cannot replace `finish()`.
+
 ### test feature without side effects
 - dispatch an action and compare expected and received state
 - FluxTestStore checks all state changes
@@ -81,30 +96,26 @@ let myMiddleware: Middleware<TestFeature> = { state, action in
 ```swift
 import FluxTestStore
 
-class CounterTests {
-    let store: TestStoreOf<CounterFeature>
-
-    init() {
-        store = .init(state: .init())
-    }
-
-    deinit {
-        store.tearDown()
-    }
-
-
+@MainActor
+struct CounterTests {
     @Test
-    @MainActor
     func counterIsIncremented_onIncrement() async {
+        let store = TestStore<CounterFeature>(state: .init())
+        defer { store.tearDown() }
+
         store.dispatch(.increment) { $0.count = 1 }
         store.dispatch(.increment) { $0.count = 2 }
+        await store.finish()
     }
 
     @Test
-    @MainActor
     func counterIsDecremented_onDecrement() async {
+        let store = TestStore<CounterFeature>(state: .init())
+        defer { store.tearDown() }
+
         store.dispatch(.decrement) { $0.count = -1 }
         store.dispatch(.decrement) { $0.count = -2 }
+        await store.finish()
     }
 }
 ```
@@ -118,6 +129,7 @@ class CounterTests {
     @MainActor
     func counterWillBeIncremented_onDecrement() async {
         store.dispatch(.decrement) { $0.count = -1 }
-        store.receive(.increment) { $0.count = 0 }
+        await store.receive(.increment) { $0.count = 0 }
+        await store.finish()
     }
 ```
