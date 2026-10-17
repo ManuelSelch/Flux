@@ -42,23 +42,26 @@ struct FluxStoreTests {
     }
 
     @Test
-    func middlewareReceivesActionAndReducedState() async {
-        let observations = AsyncStream<(TestFeature.State, TestFeature.Action)>.makeStream()
-        defer { observations.continuation.finish() }
+    func middlewareCanReactToReducedState() async {
         let store = FluxStore<TestFeature>(state: .init(count: 10), middlewares: [
             { state, action in
-                observations.continuation.yield((state, action))
-                return nil
+                action == .increment && state.count == 11 ? .increment : nil
             }
         ])
+        let states = AsyncStream<TestFeature.State>.makeStream()
+        let subscription = store.$state.sink { states.continuation.yield($0) }
+        defer {
+            subscription.cancel()
+            states.continuation.finish()
+        }
 
         store.dispatch(.increment)
 
-        var iterator = observations.stream.makeAsyncIterator()
-        let observation = await iterator.next()
-        #expect(observation?.0.count == 11)
-        #expect(observation?.1 == .increment)
-        #expect(store.state.count == 11)
+        var iterator = states.stream.makeAsyncIterator()
+        _ = await iterator.next() // Initial state.
+        _ = await iterator.next() // Dispatched increment.
+        let result = await iterator.next() // Middleware's follow-up increment.
+        #expect(result?.count == 12)
     }
 
     @Test
