@@ -44,7 +44,7 @@ struct FluxStoreTests {
     @Test
     func middlewareCanReactToReducedState() async {
         let store = FluxStore<TestFeature>(state: .init(count: 10), middlewares: [
-            { state, action in
+            TestMiddleware<TestFeature> { state, action in
                 action == .increment && state.count == 11 ? .increment : nil
             }
         ])
@@ -69,7 +69,7 @@ struct FluxStoreTests {
         let actions = AsyncStream<TestFeature.Action>.makeStream()
         defer { actions.continuation.finish() }
         let store = FluxStore<TestFeature>(state: .init(), middlewares: [
-            { _, action in
+            TestMiddleware<TestFeature> { _, action in
                 actions.continuation.yield(action)
                 switch action {
                 case .decrement: return .increment
@@ -96,11 +96,11 @@ struct FluxStoreTests {
         let observations = AsyncStream<(Int, TestFeature.Action)>.makeStream()
         defer { observations.continuation.finish() }
         let store = FluxStore<TestFeature>(state: .init(), middlewares: [
-            { _, action in
+            TestMiddleware<TestFeature> { _, action in
                 observations.continuation.yield((1, action))
                 return nil
             },
-            { _, action in
+            TestMiddleware<TestFeature> { _, action in
                 observations.continuation.yield((2, action))
                 return nil
             }
@@ -129,7 +129,7 @@ struct FluxStoreTests {
             completed.continuation.finish()
         }
         let store = FluxStore<TestFeature>(state: .init(), middlewares: [
-            { _, action in
+            TestMiddleware<TestFeature> { _, action in
                 switch action {
                 case .load:
                     var iterator = release.stream.makeAsyncIterator()
@@ -174,7 +174,7 @@ struct FluxStoreTests {
     @Test
     func statePublisherEmitsMiddlewareChanges() async {
         let store = FluxStore<TestFeature>(state: .init(), middlewares: [
-            { _, action in action == .decrement ? .increment : nil }
+            TestMiddleware<TestFeature> { _, action in action == .decrement ? .increment : nil }
         ])
         let states = AsyncStream<TestFeature.State>.makeStream()
         let subscription = store.$state.sink { states.continuation.yield($0) }

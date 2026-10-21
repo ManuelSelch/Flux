@@ -17,7 +17,7 @@ struct TestStoreFinishTests {
     @Test(.timeLimit(.minutes(1)))
     func finishSuspendsRatherThanBlockingMainActor() async {
         let gate = FinishGate()
-        let store = TestStore<FinishFeature>(state: .init(), middlewares: [{ _, _ in
+        let store = TestStore<FinishFeature>(state: .init(), middlewares: [TestMiddleware<FinishFeature> { _, _ in
             await gate.wait()
             return nil
         }])
@@ -42,7 +42,7 @@ struct TestStoreFinishTests {
     func finishIncludesFollowUpMiddlewareTasks() async {
         let initial = FinishGate()
         let final = FinishGate()
-        let store = TestStore<FinishFeature>(state: .init(), middlewares: [{ _, action in
+        let store = TestStore<FinishFeature>(state: .init(), middlewares: [TestMiddleware<FinishFeature> { _, action in
             switch action {
             case .start:
                 await initial.wait()
@@ -83,12 +83,12 @@ struct TestStoreFinishTests {
         let second = FinishGate()
         let firstCompleted = FinishSignal()
         let store = TestStore<FinishFeature>(state: .init(), middlewares: [
-            { _, _ in
+            TestMiddleware<FinishFeature> { _, _ in
                 await first.wait()
-                await firstCompleted.open()
+                firstCompleted.open()
                 return nil
             },
-            { _, _ in
+            TestMiddleware<FinishFeature> { _, _ in
                 await second.wait()
                 return nil
             }
@@ -119,7 +119,7 @@ struct TestStoreFinishTests {
     @Test(.timeLimit(.minutes(1)))
     func tearDownOnlyChecksAndDoesNotWaitForRunningWork() async {
         let gate = FinishGate()
-        let store = TestStore<FinishFeature>(state: .init(), middlewares: [{ _, _ in
+        let store = TestStore<FinishFeature>(state: .init(), middlewares: [TestMiddleware<FinishFeature> { _, _ in
             await gate.wait()
             return nil
         }])
@@ -136,12 +136,12 @@ struct TestStoreFinishTests {
     func cancellingFinishCancelsMiddlewareWork() async {
         let started = FinishSignal()
         let cancelled = FinishSignal()
-        let store = TestStore<FinishFeature>(state: .init(), middlewares: [{ _, _ in
-            await started.open()
+        let store = TestStore<FinishFeature>(state: .init(), middlewares: [TestMiddleware<FinishFeature> { _, _ in
+            started.open()
             do {
                 try await Task.sleep(nanoseconds: 3_600_000_000_000)
             } catch {
-                await cancelled.open()
+                cancelled.open()
             }
             return nil
         }])
@@ -168,12 +168,12 @@ struct TestStoreFinishTests {
     func timeoutReportsAndCancelsRemainingWorkWithoutDispatchingItsResponse() async {
         let started = FinishSignal()
         let cancelled = FinishSignal()
-        let store = TestStore<FinishFeature>(state: .init(), middlewares: [{ _, _ in
-            await started.open()
+        let store = TestStore<FinishFeature>(state: .init(), middlewares: [TestMiddleware<FinishFeature> { _, _ in
+            started.open()
             do {
                 try await Task.sleep(nanoseconds: 3_600_000_000_000)
             } catch {
-                await cancelled.open()
+                cancelled.open()
             }
             return .done // A cancelled effect must not dispatch this response.
         }])

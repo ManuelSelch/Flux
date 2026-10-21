@@ -26,7 +26,8 @@ struct TestFeature: Feature {
     }
 }
 
-let myMiddleware: Middleware<TestFeature> = { state, action in
+@MainActor
+let myMiddleware = TestMiddleware<TestFeature> { state, action in
     switch(action) {
     case .decrement:
         return .increment

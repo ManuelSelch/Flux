@@ -1,12 +1,12 @@
 import Foundation
 import Testing
-@testable import Flux
+import Flux
 
 @MainActor
 public class TestStore<F: Feature> {
     public typealias State = F.State
     public typealias Action = F.Action
-    public typealias M = Middleware<F>
+    public typealias M = any Middleware<F>
     
     public private(set) var state: State
     internal var middlewares: [M] = []
@@ -18,20 +18,28 @@ public class TestStore<F: Feature> {
     public init(state: F.State, middlewares: [M] = []) {
         self.state = state
         self.middlewares = middlewares
+
+        let handle = StoreHandle<F>(
+            getState: { [weak self] in self?.state },
+            dispatch: { [weak self] in self?.dispatch($0) }
+        )
+        middlewares.forEach { $0.initialize(handle) }
     }
     
     @MainActor
     public func dispatch(_ action: Action) {
         F().reduce(&self.state, action)
         self.recordedActions.append(action)
-    
+        let snapshot = state
+
         middlewares.forEach { middleware in
             let id = UUID()
-            effectTasks[id] = Task {
-                defer { self.effectTasks[id] = nil }
-                let effect = await middleware(state, action)
+            effectTasks[id] = Task { [weak self] in
+                defer { self?.effectTasks[id] = nil }
+                guard !Task.isCancelled else { return }
+                let effect = await middleware.after(snapshot, action)
                 guard !Task.isCancelled, let effect else { return }
-                dispatch(effect)
+                self?.dispatch(effect)
             }
         }
     }
