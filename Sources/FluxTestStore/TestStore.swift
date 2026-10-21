@@ -37,7 +37,7 @@ public class TestStore<F: Feature> {
             effectTasks[id] = Task { [weak self] in
                 defer { self?.effectTasks[id] = nil }
                 guard !Task.isCancelled else { return }
-                let effect = await middleware.after(snapshot, action)
+                let effect = await middleware.handle(snapshot, action)
                 guard !Task.isCancelled, let effect else { return }
                 self?.dispatch(effect)
             }

@@ -22,7 +22,7 @@ public protocol Middleware<F> {
 
     /// Receives the snapshot captured immediately after this action was reduced.
     /// Return a follow-up action, or use the handle to dispatch intermediate/stream updates.
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action?
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action?
 }
 
 public extension Middleware {
@@ -92,7 +92,7 @@ public class FluxStore<F: Feature>: ObservableObject {
         middlewares.forEach { middleware in
             Task { [weak self] in
                 guard !Task.isCancelled else { return }
-                let response = await middleware.after(snapshot, action)
+                let response = await middleware.handle(snapshot, action)
                 guard !Task.isCancelled, let response else { return }
                 self?.dispatch(response)
             }

@@ -205,7 +205,7 @@ private final class ContextMiddleware: Middleware {
         self.store = store
     }
 
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action? {
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action? {
         defer { completed.open() }
         return await operation?(state, action)
     }
@@ -229,7 +229,7 @@ private final class StreamMiddleware: Middleware {
         }
     }
 
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action? { nil }
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action? { nil }
 
     func stop() async {
         observation?.cancel()

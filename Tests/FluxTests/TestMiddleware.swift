@@ -9,7 +9,7 @@ struct TestMiddleware<F: Feature>: Middleware {
         self.operation = operation
     }
 
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action? {
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action? {
         await operation(state, action)
     }
 }

@@ -65,7 +65,7 @@ Observe `store.state` in SwiftUI with `@ObservedObject` or `@StateObject`.
 ## Middleware
 
 Implement `Middleware` instead of supplying a closure. Its methods are
-`@MainActor` isolated. `after` runs asynchronously after reduction and may return
+`@MainActor` isolated. `handle` runs asynchronously after reduction and may return
 one follow-up action; return `nil` when no follow-up is needed.
 
 ```swift
@@ -74,7 +74,7 @@ struct CounterMiddleware: Middleware {
 
     let loadCount: @Sendable () async throws -> Int
 
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action? {
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action? {
         guard case .load = action else { return nil }
 
         do {
@@ -102,7 +102,7 @@ func makeLoadingStore() -> FluxStore<CounterFeature> {
 Simple middleware does not need to implement it.
 
 The store calls it once per middleware entry during construction, before any
-scheduled `after` invocations. Use a fresh stateful middleware instance per
+scheduled `handle` invocations. Use a fresh stateful middleware instance per
 store. Initialize dependencies/subscriptions here; dispatch application lifecycle
 actions after store construction, rather than synchronously during initialization.
 
@@ -138,7 +138,7 @@ final class CounterUpdatesMiddleware: Middleware {
         }
     }
 
-    func after(_ state: F.State, _ action: F.Action) async -> F.Action? {
+    func handle(_ state: F.State, _ action: F.Action) async -> F.Action? {
         nil
     }
 
@@ -237,7 +237,7 @@ This is a breaking middleware API change; there is no legacy closure overload.
 
 - Replace middleware closures with types conforming to `Middleware`.
 - Declare `typealias F = YourFeature`.
-- Move the closure body into `after(_ state: F.State, _ action: F.Action) async -> F.Action?`.
+- Move the closure body into `handle(_ state: F.State, _ action: F.Action) async -> F.Action?`.
 - Keep returning optional actions for ordinary request/result operations.
 - Optionally implement `initialize(_ store: StoreHandle<F>)` for live state access,
   intermediate dispatches, or subscriptions.
