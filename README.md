@@ -5,17 +5,17 @@ asynchronous middleware, and assertion-driven tests.
 
 ## Installation
 
-Add the package to your Xcode project or Swift package. The examples below target
-the **upcoming 2.0 middleware API**; the release must be published before using
-this version requirement:
+Add the package to your Xcode project or Swift package
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ManuelSelch/Flux.git", from: "2.0.0")
+    .package(url: "https://github.com/ManuelSelch/Flux.git", from: "2.0.1")
 ]
 ```
 
-Products: `Flux` and `FluxTestStore`.
+Products: `Flux` and `FluxTestStore`
+
+Supported platforms: iOS 16+, macOS 13+, and Mac Catalyst 17+
 
 ## Feature and store
 
